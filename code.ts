@@ -25,8 +25,11 @@ figma.ui.onmessage = (msg: { type: string }) => {
     const fontData = getFontData(parentFrame, "All Styles");
     const fontMixins = fontDataAsMixins(fontData);
 
-    figma.ui.resize(800, 800);
-    figma.showUI(fontMixins);
+    // figma.ui.resize(800, 800);
+    // figma.showUI(fontMixins);
+
+    figma.ui.postMessage({ type: "mixins-created", mixins: fontMixins });
+
     // console.log(fontMixins);
   }
 
@@ -130,22 +133,22 @@ function fontDataAsMixins(fontData: FontData[]): string {
 
 function convertMixinsToSassFormat(fontMixins: FontMixin[]): string {
   const sassMixins = fontMixins.map((mixin) => {
-    let mixinString = `@mixin text${mixin.fontName} {\n\t font-size: rem(${mixin.fontSize});\n\t line-height: rem(${mixin.lineHeight});\n\t letter-spacing: rem(${mixin.letterSpacing});`;
+    let mixinString = `<div class="font-styles">@mixin text${mixin.fontName} {</div> <div class="mobile-style">font-size: rem(${mixin.fontSize});</div> <div class="mobile-style">line-height: rem(${mixin.lineHeight});</div> <div class="mobile-style">letter-spacing: rem(${mixin.letterSpacing});</div>`;
     if (
       mixin.desktopFontSize ||
       mixin.desktopLineHeight ||
       mixin.desktopLetterSpacing
     ) {
-      mixinString += `\n\n\t @include desktopAndUp {`;
+      mixinString += `<div class="desktop-font-styles">@include desktopAndUp {</div>`;
       if (mixin.desktopFontSize)
-        mixinString += `\n\t\t font-size: rem(${mixin.desktopFontSize});`;
+        mixinString += `<div class="desktop-style">font-size: rem(${mixin.desktopFontSize});</div>`;
       if (mixin.desktopLineHeight)
-        mixinString += `\n\t\t line-height: rem(${mixin.desktopLineHeight});`;
+        mixinString += `<div class="desktop-style">line-height: rem(${mixin.desktopLineHeight});</div>`;
       if (mixin.desktopLetterSpacing)
-        mixinString += `\n\t\t letter-spacing: rem(${mixin.desktopLetterSpacing});`;
-      mixinString += `\n\t }`;
+        mixinString += `<div class="desktop-style">letter-spacing: rem(${mixin.desktopLetterSpacing});</div>`;
+      mixinString += `<div class="desktop-font-styles">}</div>`;
     }
-    mixinString += `\n }`;
+    mixinString += `<div class="font-styles-end">}</div>`;
 
     return mixinString;
   });

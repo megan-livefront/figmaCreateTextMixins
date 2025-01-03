@@ -1,19 +1,52 @@
 <div class="wrapper">
-  <button id="createMixins">Generate Sass Mixins</button>
+  <button id="create-mixins">Generate Sass Mixins</button>
+  <button class="copy-all" id="copy-all">Copy to clipboard</button>
+  <div class="mixins-wrapper" id="mixins-wrapper"></div>
 </div>
 
 <script>
-  document.getElementById('createMixins').onclick = () => {
+  document.getElementById('create-mixins').onclick = () => {
     parent.postMessage({ pluginMessage: { type: 'create-sass-mixins' } }, '*')
+  }
+
+  document.getElementById('copy-all').onclick = () => {
+    const textElement = document.getElementById('mixins-wrapper');
+
+    // Create a temporary text area to hold the text to be copied
+    const textArea = document.createElement('textarea');
+    textArea.value = textElement.innerText; // Get the text content of the element
+    document.body.appendChild(textArea);
+
+    // Select the text in the textarea
+    textArea.select();
+
+    // Execute the copy command
+    document.execCommand('copy');
+
+    // Remove the temporary textarea
+    document.body.removeChild(textArea);
+
+    // Update copy button
+    document.getElementById('copy-all').innerText = 'Copied!'
+  }
+
+  window.onmessage = (event) => {
+    const { type, mixins } = event.data.pluginMessage
+    if (type === 'mixins-created') {
+      document.getElementById('copy-all').style.display = 'block'
+      document.getElementById('create-mixins').style.display = 'none'
+      document.getElementById('mixins-wrapper').innerHTML = mixins
+    }
   }
 </script>
 
 <style>
   .wrapper {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100%;
+    min-height: 100%;
   }
 
   .wrapper button {
@@ -24,5 +57,32 @@
     border: none;
     padding: 12px;
     cursor: pointer;
+  }
+
+  .copy-all {
+    margin-top: 10px;
+    display: none;
+  }
+
+  .mixins-wrapper {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .font-styles {
+    margin-top: 20px;
+  }
+
+  .desktop-font-styles {
+    margin-top: 8px;
+    padding-left: 16px;
+  }
+
+  .mobile-style {
+    padding-left: 16px;
+  }
+
+  .desktop-style {
+    padding-left: 32px;
   }
 </style>
