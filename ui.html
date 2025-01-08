@@ -2,7 +2,7 @@
   <button id="create-color-vars">Generate Sass Color Variables</button>
   <button id="create-text-mixins">Generate Sass Text Style Mixins</button>
   <button id="create-spacing-mixins">Generate Sass Spacing Mixins</button>
-  <div class="util-buttons-wrapper">
+  <div class="util-buttons-wrapper" id="util-buttons-wrapper">
     <button class="back" id="back">Back</button>
     <button class="copy-all" id="copy-all">Copy to clipboard</button>
   </div>
@@ -44,8 +44,7 @@
   }
 
   document.getElementById('back').onclick = () => {
-    document.getElementById('copy-all').style.display = 'none'
-    document.getElementById('back').style.display = 'none'
+    document.getElementById('util-buttons-wrapper').style.display = 'none'
     document.getElementById('create-text-mixins').style.display = 'block'
     document.getElementById('create-color-vars').style.display = 'block'
     document.getElementById('create-spacing-mixins').style.display = 'block'
@@ -55,8 +54,7 @@
   window.onmessage = (event) => {
     const { type, mixins } = event.data.pluginMessage
     if (type === 'mixins-created') {
-      document.getElementById('copy-all').style.display = 'block'
-      document.getElementById('back').style.display = 'block'
+      document.getElementById('util-buttons-wrapper').style.display = 'flex'
       document.getElementById('create-text-mixins').style.display = 'none'
       document.getElementById('create-color-vars').style.display = 'none'
       document.getElementById('create-spacing-mixins').style.display = 'none'
@@ -85,18 +83,10 @@
   }
 
   .util-buttons-wrapper {
-    display: flex;
+    display: none;
     justify-content: center;
     gap: 12px;
     margin-top: 16px;
-  }
-
-  .back {
-    display: none;
-  }
-
-  .copy-all {
-    display: none;
   }
 
   .content-wrapper {
