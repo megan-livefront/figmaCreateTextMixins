@@ -1,6 +1,7 @@
 <div class="wrapper">
   <button id="create-color-vars">Generate Sass Color Variables</button>
-  <button id="create-mixins">Generate Sass Mixins</button>
+  <button id="create-text-mixins">Generate Sass Text Style Mixins</button>
+  <button id="create-spacing-mixins">Generate Sass Spacing Mixins</button>
   <div class="util-buttons-wrapper">
     <button class="back" id="back">Back</button>
     <button class="copy-all" id="copy-all">Copy to clipboard</button>
@@ -9,12 +10,16 @@
 </div>
 
 <script>
-  document.getElementById('create-mixins').onclick = () => {
-    parent.postMessage({ pluginMessage: { type: 'create-sass-mixins' } }, '*')
+  document.getElementById('create-text-mixins').onclick = () => {
+    parent.postMessage({ pluginMessage: { type: 'create-text-mixins' } }, '*')
   }
 
   document.getElementById('create-color-vars').onclick = () => {
     parent.postMessage({ pluginMessage: { type: 'create-color-vars' } }, '*')
+  }
+
+  document.getElementById('create-spacing-mixins').onclick = () => {
+    parent.postMessage({ pluginMessage: { type: 'create-spacing-mixins' } }, '*')
   }
 
   document.getElementById('copy-all').onclick = () => {
@@ -41,8 +46,9 @@
   document.getElementById('back').onclick = () => {
     document.getElementById('copy-all').style.display = 'none'
     document.getElementById('back').style.display = 'none'
-    document.getElementById('create-mixins').style.display = 'block'
+    document.getElementById('create-text-mixins').style.display = 'block'
     document.getElementById('create-color-vars').style.display = 'block'
+    document.getElementById('create-spacing-mixins').style.display = 'block'
     document.getElementById('content-wrapper').innerHTML = ''
   }
 
@@ -51,8 +57,9 @@
     if (type === 'mixins-created') {
       document.getElementById('copy-all').style.display = 'block'
       document.getElementById('back').style.display = 'block'
-      document.getElementById('create-mixins').style.display = 'none'
+      document.getElementById('create-text-mixins').style.display = 'none'
       document.getElementById('create-color-vars').style.display = 'none'
+      document.getElementById('create-spacing-mixins').style.display = 'none'
       document.getElementById('content-wrapper').innerHTML = mixins
     }
   }
@@ -64,7 +71,6 @@
     flex-direction: column;
     gap: 12px;
     justify-content: center;
-    align-items: center;
     min-height: 100%;
   }
 

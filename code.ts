@@ -26,7 +26,7 @@ type FieldWithValue = {
 
 /** Generates sass mixins for all font data. */
 figma.ui.onmessage = async (msg: { type: string }) => {
-  if (msg.type === "create-sass-mixins") {
+  if (msg.type === "create-text-mixins") {
     const styles = await figma.getLocalTextStylesAsync();
 
     processStyles(styles).then((result) => {
@@ -39,7 +39,47 @@ figma.ui.onmessage = async (msg: { type: string }) => {
   if (msg.type === "create-color-vars") {
     await processColors();
   }
+
+  if (msg.type === "create-spacing-mixins") {
+    await processSpacingMixins();
+  }
 };
+
+async function processSpacingMixins() {
+  const allCollections =
+    await figma.variables.getLocalVariableCollectionsAsync();
+  const spacingCollections = allCollections.filter(
+    (collection) => collection.name === "Spacing"
+  );
+
+  if (spacingCollections.length < 1) return;
+
+  const spacingCollection = spacingCollections[0];
+  console.log(spacingCollection);
+  const spacingVars: Variable[] = [];
+
+  await Promise.all(
+    spacingCollection.variableIds.map(async (variableId) => {
+      const spacingVar = await figma.variables.getVariableByIdAsync(variableId);
+
+      if (spacingVar) spacingVars.push(spacingVar);
+    })
+  );
+
+  console.log(spacingVars);
+  let spacingVarsHtml = "";
+
+  spacingVars.forEach((spacingVar) => {
+    const valuesByModeKeys = Object.keys(spacingVar.valuesByMode);
+    const breakpointValues: number[] = [];
+    valuesByModeKeys.forEach((key) =>
+      breakpointValues.push(spacingVar.valuesByMode[key] as number)
+    );
+    const mobileVal = Math.min(...breakpointValues);
+    const desktopVal = Math.max(...breakpointValues);
+    console.log("desktop", desktopVal, "mobile", mobileVal);
+  });
+}
 
 async function getColorDataFromVarId(id: string) {
   const colorObject = await figma.variables.getVariableByIdAsync(id);
