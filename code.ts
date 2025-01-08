@@ -1,14 +1,6 @@
 figma.showUI(__html__);
 
-type FontData = {
-  fontName: string;
-  fontSize: string;
-  lineHeight: string;
-  letterSpacing: string;
-  breakpoint: "mobile" | "desktop";
-};
-
-type FontMixin = {
+type TextStyleData = {
   fontName: string;
   fontSize: string;
   lineHeight: string;
@@ -18,122 +10,145 @@ type FontMixin = {
   desktopLetterSpacing?: string;
 };
 
-/** Generates sass mixins for all font data. */
-figma.ui.onmessage = (msg: { type: string }) => {
-  if (msg.type === "create-sass-mixins") {
-    const parentFrame = figma.currentPage.selection[0] as FrameNode;
-    const fontData = getFontData(parentFrame, "All Styles");
-    const fontMixins = fontDataAsMixins(fontData);
+type TextStyleField = "fontSize" | "lineHeight" | "letterSpacing";
 
-    // figma.ui.resize(800, 800);
-    // figma.showUI(fontMixins);
+type FigmaVariableValue =
+  | string
+  | number
+  | boolean
+  | RGB
+  | VariableAlias
+  | undefined;
 
-    figma.ui.postMessage({ type: "mixins-created", mixins: fontMixins });
-
-    // console.log(fontMixins);
-  }
-
-  // figma.closePlugin();
+type FieldWithValue = {
+  value: string | number;
 };
 
-function getFontData(parentFrame: FrameNode, stylesNodeName: string) {
-  const fontData: FontData[] = [];
-  parentFrame.children.forEach((child) => {
-    if (child.type === "FRAME" && child.name === stylesNodeName) {
-      const allStylesNode = child;
-      allStylesNode.children.forEach((textStyleNode, textStyleNodeIndex) => {
-        if (textStyleNode.type === "FRAME" && textStyleNodeIndex !== 0) {
-          textStyleNode.children.forEach((breakpointStyleNode) => {
-            let fontName = "";
-            let fontSize = "";
-            let lineHeight = "";
-            let letterSpacing = "";
-            const breakpoint = breakpointStyleNode.name.includes("Desktop")
-              ? "desktop"
-              : "mobile";
+/** Generates sass mixins for all font data. */
+figma.ui.onmessage = async (msg: { type: string }) => {
+  if (msg.type === "create-sass-mixins") {
+    const styles = await figma.getLocalTextStylesAsync();
 
-            if (breakpointStyleNode.type === "FRAME") {
-              breakpointStyleNode.children.forEach(
-                (styleDetails, styleDetailsIndex) => {
-                  if (
-                    styleDetails.type === "FRAME" &&
-                    styleDetailsIndex === 0
-                  ) {
-                    fontName = (
-                      styleDetails.children[0] as TextNode
-                    ).characters.replace(/\s+/g, "");
-                  } else if (
-                    styleDetails.type === "FRAME" &&
-                    styleDetailsIndex === 1
-                  ) {
-                    styleDetails.children.forEach((fontData, index) => {
-                      if (index === 0)
-                        fontSize = (fontData as TextNode).characters;
-                      else if (index === 1)
-                        lineHeight = (fontData as TextNode).characters;
-                      else if (index === 2)
-                        letterSpacing = (fontData as TextNode).characters;
-                    });
-                  }
-                }
-              );
-              fontData.push({
-                fontName,
-                fontSize,
-                lineHeight,
-                letterSpacing,
-                breakpoint,
-              });
-            }
-          });
-        }
-      });
-    }
-  });
+    processStyles(styles).then((result) => {
+      const formattedMixins = convertMixinsToSassFormat(result);
 
-  return fontData;
-}
+      figma.ui.postMessage({ type: "mixins-created", mixins: formattedMixins });
+    });
+  }
+};
 
-function fontDataAsMixins(fontData: FontData[]): string {
-  const mixins: FontMixin[] = [];
-  const mobileStyles: FontData[] = fontData.filter(
-    (item) => item.breakpoint === "mobile"
-  );
-  const desktopStyles: FontData[] = fontData.filter(
-    (item) => item.breakpoint === "desktop"
+async function processStyles(styles: TextStyle[]) {
+  const allTextStyleData = await Promise.all(
+    styles.map(async (style) => {
+      const textStyleData = await getTextStyleData(style);
+      return textStyleData; // Return the data for this style
+    })
   );
 
-  mobileStyles.forEach((mobileStyle) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { breakpoint, ...mixinData } = mobileStyle;
-    const mixin: FontMixin = mixinData;
-
-    const desktopEquivalent = desktopStyles.find(
-      (desktopStyle) => desktopStyle.fontName === mobileStyle.fontName
-    );
-
-    if (desktopEquivalent) {
-      if (desktopEquivalent.fontSize !== mobileStyle.fontSize) {
-        mixin.desktopFontSize = desktopEquivalent.fontSize;
-      }
-      if (desktopEquivalent.lineHeight !== mobileStyle.lineHeight) {
-        mixin.desktopLineHeight = desktopEquivalent.lineHeight;
-      }
-      if (desktopEquivalent.letterSpacing !== mobileStyle.letterSpacing) {
-        mixin.desktopLetterSpacing = desktopEquivalent.letterSpacing;
-      }
-    }
-    mixins.push(mixin);
-  });
-
-  const sassMixins = convertMixinsToSassFormat(mixins);
-
-  return sassMixins;
+  return allTextStyleData;
 }
 
-function convertMixinsToSassFormat(fontMixins: FontMixin[]): string {
+async function getTextStyleData(style: TextStyle): Promise<TextStyleData> {
+  const fontSize = await getVariableBreakpointValue(
+    style,
+    "fontSize",
+    "mobile"
+  );
+  const lineHeight = await getVariableBreakpointValue(
+    style,
+    "lineHeight",
+    "mobile"
+  );
+  const letterSpacing = await getVariableBreakpointValue(
+    style,
+    "letterSpacing",
+    "mobile"
+  );
+  const desktopFontSize = await getVariableBreakpointValue(
+    style,
+    "fontSize",
+    "desktop"
+  );
+  const desktopLineHeight = await getVariableBreakpointValue(
+    style,
+    "lineHeight",
+    "desktop"
+  );
+  const desktopLetterSpacing = await getVariableBreakpointValue(
+    style,
+    "letterSpacing",
+    "desktop"
+  );
+
+  return {
+    fontName: style.name.replace(/[/\s]/g, ""),
+    fontSize: `rem(${fontSize}px)`,
+    letterSpacing: formatField(letterSpacing, "letterSpacing", style),
+    lineHeight: formatField(lineHeight, "lineHeight", style),
+    desktopFontSize: desktopFontSize ? `rem(${desktopFontSize}px)` : undefined,
+    desktopLineHeight: desktopLineHeight
+      ? formatField(lineHeight, "lineHeight", style)
+      : undefined,
+    desktopLetterSpacing: desktopLetterSpacing
+      ? formatField(letterSpacing, "letterSpacing", style)
+      : undefined,
+  };
+}
+
+function formatField(
+  value: FigmaVariableValue,
+  field: "lineHeight" | "letterSpacing",
+  style: TextStyle
+) {
+  const unit = style[field].unit;
+
+  if (unit === "PERCENT") return `${value}%`;
+  else if (unit === "PIXELS") return `rem(${value}px)`;
+  else return value?.toString() || "";
+}
+
+async function getVariableBreakpointValue(
+  style: TextStyle,
+  field: TextStyleField,
+  breakpoint: "mobile" | "desktop"
+) {
+  const isMobile = breakpoint === "mobile";
+  const variableId = style.boundVariables?.[field]?.id;
+  const variableObj = await figma.variables.getVariableByIdAsync(
+    variableId || ""
+  );
+
+  if (!variableObj) {
+    const mobileVal = (style[field] as FieldWithValue)?.value ?? style[field];
+    return isMobile ? mobileVal : undefined;
+  }
+
+  const variableValuesByMode = variableObj.valuesByMode || {};
+  const allModeKeys = Object.keys(variableValuesByMode);
+
+  if (allModeKeys.length > 1) {
+    const firstKey = allModeKeys[0];
+    const secondKey = allModeKeys[1];
+    const firstValue = variableValuesByMode[firstKey];
+    const secondValue = variableValuesByMode[secondKey];
+
+    if (!firstValue || !secondValue) return "";
+
+    const firstValLarger = firstValue > secondValue;
+
+    if (firstValue === secondValue && breakpoint === "desktop")
+      return undefined;
+
+    const mobile = firstValLarger ? secondValue : firstValue;
+    const desktop = firstValLarger ? firstValue : secondValue;
+
+    return breakpoint === "mobile" ? mobile : desktop;
+  }
+}
+
+function convertMixinsToSassFormat(fontMixins: TextStyleData[]): string {
   const sassMixins = fontMixins.map((mixin) => {
-    let mixinString = `<div class="font-styles">@mixin text${mixin.fontName} {</div> <div class="mobile-style">font-size: rem(${mixin.fontSize});</div> <div class="mobile-style">line-height: rem(${mixin.lineHeight});</div> <div class="mobile-style">letter-spacing: rem(${mixin.letterSpacing});</div>`;
+    let mixinString = `<div class="font-styles">@mixin text${mixin.fontName} {</div> <div class="mobile-style">font-size: ${mixin.fontSize};</div> <div class="mobile-style">line-height: ${mixin.lineHeight};</div> <div class="mobile-style">letter-spacing: ${mixin.letterSpacing};</div>`;
     if (
       mixin.desktopFontSize ||
       mixin.desktopLineHeight ||
@@ -141,11 +156,11 @@ function convertMixinsToSassFormat(fontMixins: FontMixin[]): string {
     ) {
       mixinString += `<div class="desktop-font-styles">@include desktopAndUp {</div>`;
       if (mixin.desktopFontSize)
-        mixinString += `<div class="desktop-style">font-size: rem(${mixin.desktopFontSize});</div>`;
+        mixinString += `<div class="desktop-style">font-size: ${mixin.desktopFontSize};</div>`;
       if (mixin.desktopLineHeight)
-        mixinString += `<div class="desktop-style">line-height: rem(${mixin.desktopLineHeight});</div>`;
+        mixinString += `<div class="desktop-style">line-height: ${mixin.desktopLineHeight};</div>`;
       if (mixin.desktopLetterSpacing)
-        mixinString += `<div class="desktop-style">letter-spacing: rem(${mixin.desktopLetterSpacing});</div>`;
+        mixinString += `<div class="desktop-style">letter-spacing: ${mixin.desktopLetterSpacing};</div>`;
       mixinString += `<div class="desktop-font-styles">}</div>`;
     }
     mixinString += `<div class="font-styles-end">}</div>`;
