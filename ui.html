@@ -1,7 +1,11 @@
 <div class="wrapper">
+  <button id="create-color-vars">Generate Sass Color Variables</button>
   <button id="create-mixins">Generate Sass Mixins</button>
-  <button class="copy-all" id="copy-all">Copy to clipboard</button>
-  <div class="mixins-wrapper" id="mixins-wrapper"></div>
+  <div class="util-buttons-wrapper">
+    <button class="back" id="back">Back</button>
+    <button class="copy-all" id="copy-all">Copy to clipboard</button>
+  </div>
+  <div class="content-wrapper" id="content-wrapper"></div>
 </div>
 
 <script>
@@ -9,8 +13,12 @@
     parent.postMessage({ pluginMessage: { type: 'create-sass-mixins' } }, '*')
   }
 
+  document.getElementById('create-color-vars').onclick = () => {
+    parent.postMessage({ pluginMessage: { type: 'create-color-vars' } }, '*')
+  }
+
   document.getElementById('copy-all').onclick = () => {
-    const textElement = document.getElementById('mixins-wrapper');
+    const textElement = document.getElementById('content-wrapper');
 
     // Create a temporary text area to hold the text to be copied
     const textArea = document.createElement('textarea');
@@ -30,12 +38,22 @@
     document.getElementById('copy-all').innerText = 'Copied!'
   }
 
+  document.getElementById('back').onclick = () => {
+    document.getElementById('copy-all').style.display = 'none'
+    document.getElementById('back').style.display = 'none'
+    document.getElementById('create-mixins').style.display = 'block'
+    document.getElementById('create-color-vars').style.display = 'block'
+    document.getElementById('content-wrapper').innerHTML = ''
+  }
+
   window.onmessage = (event) => {
     const { type, mixins } = event.data.pluginMessage
     if (type === 'mixins-created') {
       document.getElementById('copy-all').style.display = 'block'
+      document.getElementById('back').style.display = 'block'
       document.getElementById('create-mixins').style.display = 'none'
-      document.getElementById('mixins-wrapper').innerHTML = mixins
+      document.getElementById('create-color-vars').style.display = 'none'
+      document.getElementById('content-wrapper').innerHTML = mixins
     }
   }
 </script>
@@ -44,6 +62,7 @@
   .wrapper {
     display: flex;
     flex-direction: column;
+    gap: 12px;
     justify-content: center;
     align-items: center;
     min-height: 100%;
@@ -59,12 +78,21 @@
     cursor: pointer;
   }
 
-  .copy-all {
-    margin-top: 10px;
+  .util-buttons-wrapper {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .back {
     display: none;
   }
 
-  .mixins-wrapper {
+  .copy-all {
+    display: none;
+  }
+
+  .content-wrapper {
     display: flex;
     flex-direction: column;
   }
