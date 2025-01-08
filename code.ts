@@ -55,7 +55,6 @@ async function processSpacingMixins() {
   if (spacingCollections.length < 1) return;
 
   const spacingCollection = spacingCollections[0];
-  console.log(spacingCollection);
   const spacingVars: Variable[] = [];
 
   await Promise.all(
@@ -66,7 +65,6 @@ async function processSpacingMixins() {
     })
   );
 
-  console.log(spacingVars);
   let spacingVarsHtml = "";
 
   spacingVars.forEach((spacingVar) => {
@@ -77,8 +75,16 @@ async function processSpacingMixins() {
     );
     const mobileVal = Math.min(...breakpointValues);
     const desktopVal = Math.max(...breakpointValues);
-    console.log("desktop", desktopVal, "mobile", mobileVal);
+    const spacingVarName = spacingVar.name.replace(/-(.)/g, (match, p1) =>
+      p1.toUpperCase()
+    );
+
+    spacingVarsHtml += `<div class="spacing-function">@function ${spacingVarName} {</div>`;
+    spacingVarsHtml += `<div class="spacing-value">fluid(${mobileVal}, ${desktopVal});</div>`;
+    spacingVarsHtml += `<div>}</div>`;
   });
+
+  figma.ui.postMessage({ type: "mixins-created", mixins: spacingVarsHtml });
 }
 
 async function getColorDataFromVarId(id: string) {
@@ -105,7 +111,6 @@ async function processColors() {
         colorValues.type === "VARIABLE_ALIAS"
           ? await getColorDataFromVarId(colorValues.id)
           : colorValues;
-      console.log("COLOR DATA", colorData);
 
       if (!colorData) return;
 
@@ -120,7 +125,6 @@ async function processColors() {
       const colorName = colorVar.name.replace(/[/\s]/g, "");
 
       const colorVarString = `$color${colorName}: rgba(${r}, ${g}, ${b}, ${opacity});`;
-      console.log("COLOR VAR STRING", colorVarString);
 
       colorsHtml += `<div>${colorVarString}</div>`;
     })
