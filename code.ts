@@ -41,7 +41,7 @@ figma.ui.onmessage = async (msg: { type: string }) => {
   }
 };
 
-async function getColorDataFromVarId(id) {
+async function getColorDataFromVarId(id: string) {
   const colorObject = await figma.variables.getVariableByIdAsync(id);
   if (!colorObject) return;
 
