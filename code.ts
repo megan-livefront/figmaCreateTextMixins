@@ -35,7 +35,33 @@ figma.ui.onmessage = async (msg: { type: string }) => {
       figma.ui.postMessage({ type: "mixins-created", mixins: formattedMixins });
     });
   }
+
+  if (msg.type === "create-color-vars") {
+    const colorVars = await figma.getLocalPaintStylesAsync();
+    processColors(colorVars);
+  }
 };
+
+function processColors(colorVars: PaintStyle[]) {
+  let colorsHtml = "";
+
+  colorVars.forEach((colorVar) => {
+    const stringR = (colorVar.paints[0].color.r * 255).toString();
+    const stringG = (colorVar.paints[0].color.g * 255).toString();
+    const stringB = (colorVar.paints[0].color.b * 255).toString();
+    const r = parseInt(stringR);
+    const g = parseInt(stringG);
+    const b = parseInt(stringB);
+    const opacity = colorVar.paints[0].opacity;
+    const colorName = colorVar.name.replace(/[/\s]/g, "");
+
+    const colorVarString = `$color${colorName}: rgba(${r}, ${g}, ${b}, ${opacity});`;
+
+    colorsHtml += `<div>${colorVarString}</div>`;
+  });
+
+  figma.ui.postMessage({ type: "mixins-created", mixins: colorsHtml });
+}
 
 async function processStyles(styles: TextStyle[]) {
   const allTextStyleData = await Promise.all(
