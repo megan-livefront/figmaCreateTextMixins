@@ -37,28 +37,54 @@ figma.ui.onmessage = async (msg: { type: string }) => {
   }
 
   if (msg.type === "create-color-vars") {
-    const colorVars = await figma.getLocalPaintStylesAsync();
-    processColors(colorVars);
+    await processColors();
   }
 };
 
-function processColors(colorVars: PaintStyle[]) {
+async function getColorDataFromVarId(id) {
+  const colorObject = await figma.variables.getVariableByIdAsync(id);
+  if (!colorObject) return;
+
+  const valueKey = Object.keys(colorObject.valuesByMode)[0];
+  const colorValues = colorObject.valuesByMode[valueKey];
+
+  return colorValues;
+}
+
+async function processColors() {
   let colorsHtml = "";
 
-  colorVars.forEach((colorVar) => {
-    const stringR = (colorVar.paints[0].color.r * 255).toString();
-    const stringG = (colorVar.paints[0].color.g * 255).toString();
-    const stringB = (colorVar.paints[0].color.b * 255).toString();
-    const r = parseInt(stringR);
-    const g = parseInt(stringG);
-    const b = parseInt(stringB);
-    const opacity = colorVar.paints[0].opacity;
-    const colorName = colorVar.name.replace(/[/\s]/g, "");
+  const allVars = await figma.variables.getLocalVariablesAsync();
+  const allColors = allVars.filter((figVar) => figVar.resolvedType === "COLOR");
 
-    const colorVarString = `$color${colorName}: rgba(${r}, ${g}, ${b}, ${opacity});`;
+  await Promise.all(
+    allColors.map(async (colorVar) => {
+      const valueKey = Object.keys(colorVar.valuesByMode)[0];
+      const colorValues = colorVar.valuesByMode[valueKey];
+      const colorData =
+        colorValues.type === "VARIABLE_ALIAS"
+          ? await getColorDataFromVarId(colorValues.id)
+          : colorValues;
+      console.log("COLOR DATA", colorData);
 
-    colorsHtml += `<div>${colorVarString}</div>`;
-  });
+      if (!colorData) return;
+
+      const stringR = (colorData.r * 255)?.toString();
+      const stringG = (colorData.g * 255)?.toString();
+      const stringB = (colorData.b * 255)?.toString();
+      const stringA = colorData.a?.toString();
+      const r = parseInt(stringR);
+      const g = parseInt(stringG);
+      const b = parseInt(stringB);
+      const opacity = parseInt(stringA);
+      const colorName = colorVar.name.replace(/[/\s]/g, "");
+
+      const colorVarString = `$color${colorName}: rgba(${r}, ${g}, ${b}, ${opacity});`;
+      console.log("COLOR VAR STRING", colorVarString);
+
+      colorsHtml += `<div>${colorVarString}</div>`;
+    })
+  );
 
   figma.ui.postMessage({ type: "mixins-created", mixins: colorsHtml });
 }
