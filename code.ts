@@ -51,6 +51,7 @@ async function processSpacingMixins() {
   const spacingCollections = allCollections.filter(
     (collection) => collection.name === "Spacing"
   );
+  console.log(allCollections);
 
   if (spacingCollections.length < 1) return;
 
@@ -60,6 +61,7 @@ async function processSpacingMixins() {
   await Promise.all(
     spacingCollection.variableIds.map(async (variableId) => {
       const spacingVar = await figma.variables.getVariableByIdAsync(variableId);
+      console.log(spacingVar);
 
       if (spacingVar) spacingVars.push(spacingVar);
     })
