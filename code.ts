@@ -25,7 +25,7 @@ type FieldWithValue = {
 };
 
 /** Generates sass mixins for all font data. */
-figma.ui.onmessage = async (msg: { type: string }) => {
+figma.ui.onmessage = async (msg: { type: string; format: string }) => {
   if (msg.type === "create-text-mixins") {
     const styles = await figma.getLocalTextStylesAsync();
 
@@ -41,17 +41,53 @@ figma.ui.onmessage = async (msg: { type: string }) => {
   }
 
   if (msg.type === "create-spacing-mixins") {
-    await processSpacingMixins();
+    await processSpacingMixins(msg.format);
   }
 };
 
-async function processSpacingMixins() {
+function transformString(inputString: string) {
+  // Split the input string into lines based on newlines
+  const lines = inputString.split("\n");
+
+  const lineObjectsArray = lines.map((line) => {
+    // Count the number of leading tabs
+    const tabs = line.match(/\\t/g)?.length || 0;
+    console.log(tabs);
+
+    // Remove all leading tabs and newlines for the text field
+    const text = line.replace(/^\t+/, ""); // Remove leading tabs
+    const cleanedText = text.replace(/\\n|\\t/g, ""); // Remove any explicit \n or \t sequences
+
+    return {
+      text: cleanedText, // text without \n and \t
+      tabs: tabs, // number of leading tabs
+    };
+  });
+
+  let linesHtml = "";
+
+  lineObjectsArray.forEach((line, index) => {
+    const isFirst = index === 0;
+    const firstClass = isFirst ? "first-line" : "";
+    const isLast = index === lineObjectsArray.length - 1;
+    const lastClass = isLast ? "last-line" : "";
+    const tabsClass = line.tabs > 0 ? `tab-${line.tabs}` : "";
+    const className = `${firstClass} ${lastClass} ${tabsClass}`;
+
+    const lineDiv = `<div class="${className}">${line.text}</div>`;
+
+    linesHtml += lineDiv;
+  });
+
+  return linesHtml;
+}
+
+async function processSpacingMixins(format: string) {
   const allCollections =
     await figma.variables.getLocalVariableCollectionsAsync();
   const spacingCollections = allCollections.filter(
     (collection) => collection.name === "Spacing"
   );
-  console.log(allCollections);
 
   if (spacingCollections.length < 1) return;
 
@@ -61,7 +97,6 @@ async function processSpacingMixins() {
   await Promise.all(
     spacingCollection.variableIds.map(async (variableId) => {
       const spacingVar = await figma.variables.getVariableByIdAsync(variableId);
-      console.log(spacingVar);
 
       if (spacingVar) spacingVars.push(spacingVar);
     })
@@ -69,24 +104,47 @@ async function processSpacingMixins() {
 
   let spacingVarsHtml = "";
 
+  // Convert the input string to the required format
+  const formatAsObject = transformString(format);
+
   spacingVars.forEach((spacingVar) => {
     const valuesByModeKeys = Object.keys(spacingVar.valuesByMode);
     const breakpointValues: number[] = [];
     valuesByModeKeys.forEach((key) =>
       breakpointValues.push(spacingVar.valuesByMode[key] as number)
     );
-    const mobileVal = Math.min(...breakpointValues);
-    const desktopVal = Math.max(...breakpointValues);
-    const spacingVarName = spacingVar.name.replace(/-(.)/g, (match, p1) =>
+    const mobileVal = Math.min(...breakpointValues).toString();
+    const desktopVal = Math.max(...breakpointValues).toString();
+    const spacingName = spacingVar.name.replace(/-(.)/g, (match, p1) =>
       p1.toUpperCase()
     );
 
-    spacingVarsHtml += `<div class="spacing-function">@function ${spacingVarName} {</div>`;
-    spacingVarsHtml += `<div class="spacing-value">fluid(${mobileVal}, ${desktopVal});</div>`;
-    spacingVarsHtml += `<div>}</div>`;
+    const variables = {
+      spacingName,
+      mobileVal,
+      desktopVal,
+    };
+
+    spacingVarsHtml += insertVariables(formatAsObject, variables);
   });
 
   figma.ui.postMessage({ type: "mixins-created", mixins: spacingVarsHtml });
+}
+
+function insertVariables(
+  inputString: string,
+  variables: Record<string, string>
+) {
+  // Use a regular expression to replace the placeholders in the input string
+  return inputString.replace(/\$\{([^}]+)\}/g, (match, variableName) => {
+    // Check if the variable exists in the provided variables object
+    if (Object.prototype.hasOwnProperty.call(variables, variableName)) {
+      return variables[variableName];
+    } else {
+      // If the variable is not found, return the original placeholder
+      return match;
+    }
+  });
 }
 
 async function getColorDataFromVarId(id: string) {

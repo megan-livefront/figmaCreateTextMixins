@@ -2,6 +2,8 @@
   <button id="create-color-vars">Generate Sass Color Variables</button>
   <button id="create-text-mixins">Generate Sass Text Style Mixins</button>
   <button id="create-spacing-mixins">Generate Sass Spacing Mixins</button>
+  <textarea id="formatter"></textarea>
+  <button id="formatter-submit">Generate</button>
   <div class="util-buttons-wrapper" id="util-buttons-wrapper">
     <button class="back" id="back">Back</button>
     <button class="copy-all" id="copy-all">Copy to clipboard</button>
@@ -19,7 +21,18 @@
   }
 
   document.getElementById('create-spacing-mixins').onclick = () => {
-    parent.postMessage({ pluginMessage: { type: 'create-spacing-mixins' } }, '*')
+    document.getElementById('create-text-mixins').style.display = 'none'
+    document.getElementById('create-color-vars').style.display = 'none'
+    document.getElementById('create-spacing-mixins').style.display = 'none'
+    document.getElementById('formatter').style.display = 'block'
+    document.getElementById('formatter-submit').style.display = 'block'
+  }
+
+  document.getElementById('formatter-submit').onclick = (event) => {
+    const formatterText = document.getElementById('formatter').value
+    document.getElementById('formatter').style.display = 'none'
+    document.getElementById('formatter-submit').style.display = 'none'
+    parent.postMessage({ pluginMessage: { type: 'create-spacing-mixins', format: formatterText } }, '*')
   }
 
   document.getElementById('copy-all').onclick = () => {
@@ -80,6 +93,27 @@
     border: none;
     padding: 12px;
     cursor: pointer;
+  }
+
+  .first-line {
+    margin-top: 10px;
+  }
+
+  .tab-1 {
+    padding-left: 16px;
+  }
+
+  .tab-2 {
+    padding-left: 32px;
+  }
+
+  #formatter {
+    display: none;
+    height: 100px;
+  }
+
+  #formatter-submit {
+    display: none;
   }
 
   .util-buttons-wrapper {
