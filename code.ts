@@ -109,21 +109,23 @@ async function processColors() {
     allColors.map(async (colorVar) => {
       const valueKey = Object.keys(colorVar.valuesByMode)[0];
       const colorValues = colorVar.valuesByMode[valueKey];
+      const colorValuesAsVarAlias = colorValues as VariableAlias;
       const colorData =
-        colorValues.type === "VARIABLE_ALIAS"
-          ? await getColorDataFromVarId(colorValues.id)
+        colorValuesAsVarAlias?.type === "VARIABLE_ALIAS"
+          ? await getColorDataFromVarId(colorValuesAsVarAlias?.id)
           : colorValues;
 
       if (!colorData) return;
 
-      const stringR = (colorData.r * 255)?.toString();
-      const stringG = (colorData.g * 255)?.toString();
-      const stringB = (colorData.b * 255)?.toString();
-      const stringA = colorData.a?.toString();
+      const colorDataRgba = colorData as RGBA;
+      const stringR = (colorDataRgba?.r * 255)?.toString();
+      const stringG = (colorDataRgba?.g * 255)?.toString();
+      const stringB = (colorDataRgba?.b * 255)?.toString();
+      const stringA = colorDataRgba?.a?.toString();
       const r = parseInt(stringR);
       const g = parseInt(stringG);
       const b = parseInt(stringB);
-      const opacity = parseInt(stringA);
+      const opacity = stringA ? parseInt(stringA) : 1;
       const colorName = colorVar.name.replace(/[/\s]/g, "");
 
       const colorVarString = `$color${colorName}: rgba(${r}, ${g}, ${b}, ${opacity});`;
