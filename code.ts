@@ -52,7 +52,6 @@ function transformString(inputString: string) {
   const lineObjectsArray = lines.map((line) => {
     // Count the number of leading tabs
     const tabs = line.match(/\\t/g)?.length || 0;
-    console.log(tabs);
 
     // Remove all leading tabs and newlines for the text field
     const text = line.replace(/^\t+/, ""); // Remove leading tabs
