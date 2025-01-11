@@ -20,7 +20,6 @@
   }
 
   document.getElementById('collections-select').onchange = (event) => {
-    console.log('EVENT', event.target.value)
     document.getElementById('current-collection-id').innerText = event.target.value
     parent.postMessage({ pluginMessage: { type: 'collection-selected', collectionId: event.target.value } }, '*')
   }
@@ -88,8 +87,6 @@
 
         select.appendChild(option)
       })
-
-      console.log('COLLECTIONS', collections)
     }
     else if (type === 'collection-vars-loaded') {
       const { formattingVars } = messageData
@@ -111,8 +108,6 @@
       document.getElementById('formatter-submit').style.display = 'block'
       document.getElementById('collections-select').style.display = 'none'
       document.getElementById('load-collections').style.display = 'none'
-
-      console.log('FORMATTING VARS', varNamesString)
     }
   }
 </script>

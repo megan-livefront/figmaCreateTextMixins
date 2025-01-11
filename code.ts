@@ -43,36 +43,14 @@ async function postFormattedVariables(format: string, collectionId: string) {
   // get all variables in the collection
   const collectionVars: Variable[] = await getCollectionVariables(collection);
 
-  let collectionVarsHtml = "";
-
   // Convert the input format string to an html string
   const formatHtmlString = transformFormatStringToHtmlString(format);
 
-  for (const collectionVar of collectionVars) {
-    const modeValuesForVariable: ModeMap[] = await getModeValuesForVariable(
-      collectionVar,
-      collection.modes
-    );
-
-    // put all mode value objects from the `modeValuesForVariable` array into one object
-    const allModeValuesObject = getAllModeValuesObject(modeValuesForVariable);
-
-    // create the object that tells `insertVariables` what values to replace and with what value
-    const varNameKey = `${toCamelCase(collection.name)}VarName`;
-    const variablesToReplaceWithValues = {
-      [varNameKey]: toCamelCase(collectionVar.name),
-      ...allModeValuesObject,
-    };
-
-    // create the html string that has the values from the variable in it
-    const htmlStringWithRealValues = insertVariables(
-      formatHtmlString,
-      variablesToReplaceWithValues
-    );
-
-    // add the created html string to the main html string that will be presented to the user
-    collectionVarsHtml += htmlStringWithRealValues;
-  }
+  const collectionVarsHtml = await getCollectionVarsHtmlString(
+    formatHtmlString,
+    collection,
+    collectionVars
+  );
 
   figma.ui.postMessage({ type: "mixins-created", mixins: collectionVarsHtml });
 }
@@ -129,6 +107,45 @@ function transformFormatStringToHtmlString(inputString: string): string {
   });
 
   return linesHtml;
+}
+
+/**
+ * Uses `formatHtmlString` to create an html string with dynamic variable data for each
+ * variable in `collectionVars`. Returns one large html string with all variable data.
+ */
+async function getCollectionVarsHtmlString(
+  formatHtmlString: string,
+  collection: VariableCollection,
+  collectionVars: Variable[]
+) {
+  let collectionVarsHtml = "";
+  for (const collectionVar of collectionVars) {
+    const modeValuesForVariable: ModeMap[] = await getModeValuesForVariable(
+      collectionVar,
+      collection.modes
+    );
+
+    // put all mode value objects from the `modeValuesForVariable` array into one object
+    const allModeValuesObject = getAllModeValuesObject(modeValuesForVariable);
+
+    // create the object that tells `insertVariables` what values to replace and with what value
+    const varNameKey = `${toCamelCase(collection.name)}VarName`;
+    const variablesToReplaceWithValues = {
+      [varNameKey]: toCamelCase(collectionVar.name),
+      ...allModeValuesObject,
+    };
+
+    // create the html string that has the values from the variable in it
+    const htmlStringWithRealValues = insertVariables(
+      formatHtmlString,
+      variablesToReplaceWithValues
+    );
+
+    // add the created html string to the main html string that will be presented to the user
+    collectionVarsHtml += htmlStringWithRealValues;
+  }
+
+  return collectionVarsHtml;
 }
 
 /** Returns the variables values for each of the given modes. */
