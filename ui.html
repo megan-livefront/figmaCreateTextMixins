@@ -1,6 +1,8 @@
 <div class="wrapper">
   <button id="load-collections">load collections</button>
-  <select id="collections-select"></select>
+  <div class="select-wrapper">
+    <select id="collections-select"></select>
+  </div>
 
   <div id="formatting-instructions"></div>
   <textarea id="formatter"></textarea>
@@ -129,6 +131,27 @@
     border: none;
     padding: 12px;
     cursor: pointer;
+  }
+
+  .select-wrapper {
+    position: relative;
+  }
+
+  .select-wrapper::after {
+    content: '^';
+    position: absolute;
+    right: 12px;
+    top: 25%;
+    transform: rotate(180deg) scale(2, 1);
+  }
+
+  #collections-select {
+    padding: 12px;
+    cursor: pointer;
+    appearance: none;
+    position: relative;
+    border-radius: 6px;
+    width: 100%;
   }
 
   #current-collection-id {
