@@ -62,16 +62,26 @@ figma.ui.onmessage = async (msg: {
       msg.collectionId
     );
 
-    const collectionVariables = [];
-    collection?.variableIds.map(async (id) => {
-      const variable = await figma.variables.getVariableByIdAsync(id);
-      collectionVariables.push(variable);
-    });
-
     if (!collection) return;
 
+    const collectionFirstVariableId = collection.variableIds[0];
+    const collectionVariable = await figma.variables.getVariableByIdAsync(
+      collectionFirstVariableId
+    );
+    const collectionType = collectionVariable?.resolvedType;
+    console.log("COLLECTION", collection);
+    console.log("VARIABLE", collectionVariable);
+
     const formattingVars = [`${toCamelCase(collection.name)}VarName`];
-    collection.modes.forEach((mode) => formattingVars.push(mode.name));
+    if (collectionType === "COLOR") {
+      collection.modes.forEach((mode) => {
+        ["R", "G", "B", "A"].forEach((rgbaVal) =>
+          formattingVars.push(`${mode.name}-${rgbaVal}`)
+        );
+      });
+    } else {
+      collection.modes.forEach((mode) => formattingVars.push(mode.name));
+    }
 
     figma.ui.postMessage({
       type: "collection-vars-loaded",
@@ -132,7 +142,8 @@ async function printFormattedVariables(format: string, collectionId: string) {
     );
 
     // put all mode value objects from the `modeValuesForVariable` array into one object
-    const allModeValuesObject = Object.assign({}, ...modeValuesForVariable);
+    const allModeValuesObject = getAllModeValuesObject(modeValuesForVariable);
+    console.log("OBJECT TO SPREAD", allModeValuesObject);
 
     // create the object that tells `insertVariables` what values to replace and with what value
     const varNameKey = `${toCamelCase(collection.name)}VarName`;
@@ -154,6 +165,32 @@ async function printFormattedVariables(format: string, collectionId: string) {
   figma.ui.postMessage({ type: "mixins-created", mixins: collectionVarsHtml });
 }
 
+function getAllModeValuesObject(modeValues: ModeMap[]): Record<string, string> {
+  const flattenedModeValues: ModeMap = Object.assign({}, ...modeValues);
+  const modeNames = Object.keys(flattenedModeValues);
+  let modeMapToReturn = flattenedModeValues;
+  modeNames.forEach((modeName) => {
+    const modeValue = flattenedModeValues[modeName];
+    if (typeof modeValue === "object") {
+      const keysOfModeValueObject = Object.keys(modeValue);
+      const formattedModeValueObject: Record<string, string> = {};
+      keysOfModeValueObject.forEach((modeValueKey) => {
+        const formattedKey = `${modeName}-${modeValueKey.toUpperCase()}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- we know `modeValueKey` is a key of `modeValue`
+        const colorVal = (modeValue as any)[modeValueKey];
+        const multiplier = modeValueKey === "a" ? 1 : 255; // The `a` value is for opacity, we want that to be 1 or lower
+        const colorValAsRGBA = parseFloat(colorVal) * multiplier;
+        const roundedRGBAVal = parseInt(colorValAsRGBA.toString());
+        formattedModeValueObject[formattedKey] = roundedRGBAVal.toString();
+      });
+
+      modeMapToReturn = { ...modeMapToReturn, ...formattedModeValueObject };
+    }
+  });
+
+  return modeMapToReturn as Record<string, string>;
+}
+
 /** Returns the variables values for each of the given modes. */
 async function getModeValuesForVariable(
   variable: Variable,
@@ -165,14 +202,14 @@ async function getModeValuesForVariable(
   for (const [index, mode] of modes.entries()) {
     const modeValue = variable.valuesByMode[mode.modeId];
 
-    // Figure out what to do for colors and variable aliases
+    // Figure out what to do for colors
     if (modeValIsVariableAlias(modeValue)) {
-      // Await the alias values to ensure that recursion completes before continuing
       return (await getAliasVariableModeValues(modeValue, modes)) || [];
     } else {
       const modeKey = aliasOriginalModes
         ? aliasOriginalModes[index].name
         : mode.name;
+
       const modeMap = { [modeKey]: modeValue };
       modeMaps.push(modeMap);
     }
