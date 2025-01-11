@@ -164,7 +164,8 @@ async function getModeValuesForVariable(
 
     // Figure out what to do for colors
     if (modeValIsVariableAlias(modeValue)) {
-      return (await getAliasVariableModeValues(modeValue, modes)) || [];
+      const modesToPass = aliasOriginalModes || modes;
+      return (await getAliasVariableModeValues(modeValue, modesToPass)) || [];
     } else {
       const modeKey = aliasOriginalModes
         ? aliasOriginalModes[index].name
