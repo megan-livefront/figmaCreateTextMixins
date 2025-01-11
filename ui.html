@@ -31,7 +31,7 @@
     document.getElementById('formatting-instructions').style.display = 'none'
     document.getElementById('formatter').style.display = 'none'
     document.getElementById('formatter-submit').style.display = 'none'
-    parent.postMessage({ pluginMessage: { type: 'create-mixins', format: formatterText, collectionId } }, '*')
+    parent.postMessage({ pluginMessage: { type: 'format-variable-data', format: formatterText, collectionId } }, '*')
   }
 
   document.getElementById('copy-all').onclick = () => {
