@@ -52,7 +52,10 @@ async function postFormattedVariables(format: string, collectionId: string) {
     collectionVars
   );
 
-  figma.ui.postMessage({ type: "mixins-created", mixins: collectionVarsHtml });
+  figma.ui.postMessage({
+    type: "variables-formatted",
+    mixins: collectionVarsHtml,
+  });
 }
 
 /** Returns all variables in a collection. */

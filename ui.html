@@ -67,7 +67,7 @@
   window.onmessage = (event) => {
     const messageData = event.data.pluginMessage
     const { type } = messageData
-    if (type === 'mixins-created') {
+    if (type === 'variables-formatted') {
       const { mixins } = messageData
 
       document.getElementById('util-buttons-wrapper').style.display = 'flex'
@@ -170,30 +170,5 @@
   .content-wrapper {
     display: flex;
     flex-direction: column;
-  }
-
-  .spacing-function {
-    margin-top: 8px;
-  }
-
-  .spacing-value {
-    padding-left: 16px;
-  }
-
-  .font-styles {
-    margin-top: 20px;
-  }
-
-  .desktop-font-styles {
-    margin-top: 8px;
-    padding-left: 16px;
-  }
-
-  .mobile-style {
-    padding-left: 16px;
-  }
-
-  .desktop-style {
-    padding-left: 32px;
   }
 </style>
