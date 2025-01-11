@@ -1,51 +1,225 @@
 figma.showUI(__html__);
 
-type TextStyleData = {
-  fontName: string;
-  fontSize: string;
-  lineHeight: string;
-  letterSpacing: string;
-  desktopFontSize?: string;
-  desktopLineHeight?: string;
-  desktopLetterSpacing?: string;
+// type TextStyleData = {
+//   fontName: string;
+//   fontSize: string;
+//   lineHeight: string;
+//   letterSpacing: string;
+//   desktopFontSize?: string;
+//   desktopLineHeight?: string;
+//   desktopLetterSpacing?: string;
+// };
+
+// type TextStyleField = "fontSize" | "lineHeight" | "letterSpacing";
+
+// type FigmaVariableValue =
+//   | string
+//   | number
+//   | boolean
+//   | RGB
+//   | VariableAlias
+//   | undefined;
+
+type Mode = {
+  modeId: string;
+  name: string;
 };
 
-type TextStyleField = "fontSize" | "lineHeight" | "letterSpacing";
-
-type FigmaVariableValue =
-  | string
-  | number
-  | boolean
-  | RGB
-  | VariableAlias
-  | undefined;
-
-type FieldWithValue = {
-  value: string | number;
+type ModeMap = {
+  [modeId: string]: VariableValue;
 };
+
+// type FieldWithValue = {
+//   value: string | number;
+// };
 
 /** Generates sass mixins for all font data. */
-figma.ui.onmessage = async (msg: { type: string; format: string }) => {
-  if (msg.type === "create-text-mixins") {
-    const styles = await figma.getLocalTextStylesAsync();
+figma.ui.onmessage = async (msg: {
+  type: string;
+  format: string;
+  collectionId: string;
+}) => {
+  if (msg.type === "create-mixins") {
+    await printFormattedVariables(msg.format, msg.collectionId);
+  }
 
-    processStyles(styles).then((result) => {
-      const formattedMixins = convertMixinsToSassFormat(result);
+  if (msg.type === "load-collections") {
+    const collections =
+      await figma.variables.getLocalVariableCollectionsAsync();
+    const collectionNames = collections.map((collection) => ({
+      name: collection.name,
+      id: collection.id,
+    }));
 
-      figma.ui.postMessage({ type: "mixins-created", mixins: formattedMixins });
+    figma.ui.postMessage({
+      type: "collections-loaded",
+      collections: collectionNames,
     });
   }
 
-  if (msg.type === "create-color-vars") {
-    await processColors();
-  }
+  if (msg.type === "collection-selected") {
+    const collection = await figma.variables.getVariableCollectionByIdAsync(
+      msg.collectionId
+    );
 
-  if (msg.type === "create-spacing-mixins") {
-    await processSpacingMixins(msg.format);
+    const collectionVariables = [];
+    collection?.variableIds.map(async (id) => {
+      const variable = await figma.variables.getVariableByIdAsync(id);
+      collectionVariables.push(variable);
+    });
+
+    if (!collection) return;
+
+    const formattingVars = [`${toCamelCase(collection.name)}VarName`];
+    collection.modes.forEach((mode) => formattingVars.push(mode.name));
+
+    figma.ui.postMessage({
+      type: "collection-vars-loaded",
+      formattingVars,
+    });
   }
 };
 
-function transformString(inputString: string) {
+/** Returns a camelcase string with dashes and slashes removed. */
+function toCamelCase(str: string) {
+  return str
+    .replace(/[/\\-]/g, "") // Remove slashes (both / and \) and dashes (-)
+    .replace(/(?:^\w|[A-Z]|\b\w|\s+)/g, (match, index) =>
+      index === 0 ? match.toLowerCase() : match.toUpperCase()
+    )
+    .replace(/\s+/g, "") // Remove spaces
+    .replace(/^(.)/, (match) => match.toLowerCase()); // Make first character lowercase
+}
+
+/** Returns all variables in a collection. */
+async function getCollectionVariables(collection: VariableCollection) {
+  const collectionVars: Variable[] = [];
+
+  await Promise.all(
+    collection.variableIds.map(async (variableId) => {
+      const collectionVar = await figma.variables.getVariableByIdAsync(
+        variableId
+      );
+
+      if (collectionVar) collectionVars.push(collectionVar);
+    })
+  );
+
+  return collectionVars;
+}
+
+/** Posts a message to the UI with all variables in the collection in the given format. */
+async function printFormattedVariables(format: string, collectionId: string) {
+  // get the selected collection
+  const collection = await figma.variables.getVariableCollectionByIdAsync(
+    collectionId
+  );
+
+  if (!collection || collection.variableIds.length < 1) return;
+
+  // get all variables in the collection
+  const collectionVars: Variable[] = await getCollectionVariables(collection);
+
+  let collectionVarsHtml = "";
+
+  // Convert the input format string to an html string
+  const formatHtmlString = transformString(format);
+
+  await Promise.all(
+    collectionVars.map(async (collectionVar) => {
+      // get the variable's values for each mode in the collection in the format [{ [mode1Name]: 20 }, { [mode2Name]: 40 }]
+      const modeValuesForVariable: ModeMap[] = await getModeValuesForVariable(
+        collectionVar,
+        collection.modes
+      );
+
+      // put all mode value objects from the `modeValuesForVariable` array into one object
+      const allModeValuesObject = Object.assign({}, ...modeValuesForVariable);
+
+      // create the object that tells `insertVariables` what values to replace and with what value
+      const varNameKey = `${toCamelCase(collection.name)}VarName`;
+      const variablesToReplaceWithValues = {
+        [varNameKey]: toCamelCase(collectionVar.name),
+        ...allModeValuesObject,
+      };
+
+      console.log("VARIABLES OBJECT", variablesToReplaceWithValues);
+
+      // create the html string that has the values from the variable in it
+      const htmlStringWithRealValues = insertVariables(
+        formatHtmlString,
+        variablesToReplaceWithValues
+      );
+
+      // add the created html string to the main html string that will be presented to the user
+      collectionVarsHtml += htmlStringWithRealValues;
+    })
+  );
+
+  figma.ui.postMessage({ type: "mixins-created", mixins: collectionVarsHtml });
+}
+
+/** Returns the variables values for each of the given modes. */
+async function getModeValuesForVariable(
+  variable: Variable,
+  modes: Mode[]
+): Promise<ModeMap[]> {
+  const modeMaps: ModeMap[] = [];
+
+  await Promise.all(
+    modes.map(async (mode) => {
+      const modeValue = variable.valuesByMode[mode.modeId];
+      // Figure out what to do for colors and variable aliases
+      if (modeValIsVariableAlias(modeValue)) {
+        return await getAliasVariableModeValues(modeValue);
+      }
+
+      const modeMap = { [mode.name]: modeValue };
+      console.log("GETTING HERE", modeMap);
+      modeMaps.push(modeMap);
+    })
+  );
+
+  return modeMaps;
+}
+
+async function getAliasVariableModeValues(modeValue: VariableValue) {
+  const aliasId = getAliasModeValueId(modeValue);
+  const aliasedVariable = await figma.variables.getVariableByIdAsync(aliasId);
+
+  if (!aliasedVariable) return;
+
+  const aliasedVariableCollection =
+    await figma.variables.getVariableCollectionByIdAsync(
+      aliasedVariable?.variableCollectionId
+    );
+
+  if (!aliasedVariableCollection) return;
+
+  return await getModeValuesForVariable(
+    aliasedVariable,
+    aliasedVariableCollection.modes
+  );
+}
+
+/** Returns true if the given mode value is of type variable alias. */
+function getAliasModeValueId(value: VariableValue) {
+  if (!(typeof value === "object") || !("id" in value)) return "id not found";
+
+  return value.id;
+}
+
+/** Returns true if the given mode value is of type variable alias. */
+function modeValIsVariableAlias(value: VariableValue) {
+  return (
+    typeof value === "object" &&
+    "type" in value &&
+    value.type === "VARIABLE_ALIAS"
+  );
+}
+
+/** Returns the given input string as an html string with each line as its own `div`. */
+function transformString(inputString: string): string {
   // Split the input string into lines based on newlines
   const lines = inputString.split("\n");
 
@@ -81,61 +255,14 @@ function transformString(inputString: string) {
   return linesHtml;
 }
 
-async function processSpacingMixins(format: string) {
-  const allCollections =
-    await figma.variables.getLocalVariableCollectionsAsync();
-  const spacingCollections = allCollections.filter(
-    (collection) => collection.name === "Spacing"
-  );
-
-  if (spacingCollections.length < 1) return;
-
-  const spacingCollection = spacingCollections[0];
-  const spacingVars: Variable[] = [];
-
-  await Promise.all(
-    spacingCollection.variableIds.map(async (variableId) => {
-      const spacingVar = await figma.variables.getVariableByIdAsync(variableId);
-
-      if (spacingVar) spacingVars.push(spacingVar);
-    })
-  );
-
-  let spacingVarsHtml = "";
-
-  // Convert the input string to the required format
-  const formatAsObject = transformString(format);
-
-  spacingVars.forEach((spacingVar) => {
-    const valuesByModeKeys = Object.keys(spacingVar.valuesByMode);
-    const breakpointValues: number[] = [];
-    valuesByModeKeys.forEach((key) =>
-      breakpointValues.push(spacingVar.valuesByMode[key] as number)
-    );
-    const mobileVal = Math.min(...breakpointValues).toString();
-    const desktopVal = Math.max(...breakpointValues).toString();
-    const spacingName = spacingVar.name.replace(/-(.)/g, (match, p1) =>
-      p1.toUpperCase()
-    );
-
-    const variables = {
-      spacingName,
-      mobileVal,
-      desktopVal,
-    };
-
-    spacingVarsHtml += insertVariables(formatAsObject, variables);
-  });
-
-  figma.ui.postMessage({ type: "mixins-created", mixins: spacingVarsHtml });
-}
-
 function insertVariables(
   inputString: string,
   variables: Record<string, string>
 ) {
   // Use a regular expression to replace the placeholders in the input string
   return inputString.replace(/\$\{([^}]+)\}/g, (match, variableName) => {
+    // Need to make sure we are mapping the aliased variables mode name to the original one we asked the user to use
+    console.log("VARIABLE INFO", variables, variableName);
     // Check if the variable exists in the provided variables object
     if (Object.prototype.hasOwnProperty.call(variables, variableName)) {
       return variables[variableName];
@@ -146,189 +273,62 @@ function insertVariables(
   });
 }
 
-async function getColorDataFromVarId(id: string) {
-  const colorObject = await figma.variables.getVariableByIdAsync(id);
-  if (!colorObject) return;
+// async function getColorDataFromVarId(id: string) {
+//   const colorObject = await figma.variables.getVariableByIdAsync(id);
+//   if (!colorObject) return;
 
-  const valueKey = Object.keys(colorObject.valuesByMode)[0];
-  const colorValues = colorObject.valuesByMode[valueKey];
+//   const valueKey = Object.keys(colorObject.valuesByMode)[0];
+//   const colorValues = colorObject.valuesByMode[valueKey];
 
-  return colorValues;
-}
+//   return colorValues;
+// }
 
-async function processColors() {
-  let colorsHtml = "";
+// async function processColors() {
+//   let colorsHtml = "";
 
-  const allVars = await figma.variables.getLocalVariablesAsync();
-  const allColors = allVars.filter((figVar) => figVar.resolvedType === "COLOR");
+//   const allVars = await figma.variables.getLocalVariablesAsync();
+//   const allColors = allVars.filter((figVar) => figVar.resolvedType === "COLOR");
 
-  await Promise.all(
-    allColors.map(async (colorVar) => {
-      const valueKey = Object.keys(colorVar.valuesByMode)[0];
-      const colorValues = colorVar.valuesByMode[valueKey];
-      const colorValuesAsVarAlias = colorValues as VariableAlias;
-      const colorData =
-        colorValuesAsVarAlias?.type === "VARIABLE_ALIAS"
-          ? await getColorDataFromVarId(colorValuesAsVarAlias?.id)
-          : colorValues;
+//   await Promise.all(
+//     allColors.map(async (colorVar) => {
+//       const valueKey = Object.keys(colorVar.valuesByMode)[0];
+//       const colorValues = colorVar.valuesByMode[valueKey];
+//       const colorValuesAsVarAlias = colorValues as VariableAlias;
+//       const colorData =
+//         colorValuesAsVarAlias?.type === "VARIABLE_ALIAS"
+//           ? await getColorDataFromVarId(colorValuesAsVarAlias?.id)
+//           : colorValues;
 
-      if (!colorData) return;
+//       if (!colorData) return;
 
-      const colorDataRgba = colorData as RGBA;
-      const stringR = (colorDataRgba?.r * 255)?.toString();
-      const stringG = (colorDataRgba?.g * 255)?.toString();
-      const stringB = (colorDataRgba?.b * 255)?.toString();
-      const stringA = colorDataRgba?.a?.toString();
-      const r = parseInt(stringR);
-      const g = parseInt(stringG);
-      const b = parseInt(stringB);
-      const opacity = stringA ? parseInt(stringA) : 1;
-      const colorName = colorVar.name.replace(/[/\s]/g, "");
+//       const colorDataRgba = colorData as RGBA;
+//       const stringR = (colorDataRgba?.r * 255)?.toString();
+//       const stringG = (colorDataRgba?.g * 255)?.toString();
+//       const stringB = (colorDataRgba?.b * 255)?.toString();
+//       const stringA = colorDataRgba?.a?.toString();
+//       const r = parseInt(stringR);
+//       const g = parseInt(stringG);
+//       const b = parseInt(stringB);
+//       const opacity = stringA ? parseInt(stringA) : 1;
+//       const colorName = colorVar.name.replace(/[/\s]/g, "");
 
-      const colorVarString = `$color${colorName}: rgba(${r}, ${g}, ${b}, ${opacity});`;
+//       const colorVarString = `$color${colorName}: rgba(${r}, ${g}, ${b}, ${opacity});`;
 
-      colorsHtml += `<div>${colorVarString}</div>`;
-    })
-  );
+//       colorsHtml += `<div>${colorVarString}</div>`;
+//     })
+//   );
 
-  figma.ui.postMessage({ type: "mixins-created", mixins: colorsHtml });
-}
+//   figma.ui.postMessage({ type: "mixins-created", mixins: colorsHtml });
+// }
 
-async function processStyles(styles: TextStyle[]) {
-  const allTextStyleData = await Promise.all(
-    styles.map(async (style) => {
-      const textStyleData = await getTextStyleData(style);
-      return textStyleData; // Return the data for this style
-    })
-  );
+// function formatField(
+//   value: FigmaVariableValue,
+//   field: "lineHeight" | "letterSpacing",
+//   style: TextStyle
+// ) {
+//   const unit = style[field].unit;
 
-  return allTextStyleData;
-}
-
-async function getTextStyleData(style: TextStyle): Promise<TextStyleData> {
-  const fontSize = await getVariableBreakpointValue(
-    style,
-    "fontSize",
-    "mobile"
-  );
-  const lineHeight = await getVariableBreakpointValue(
-    style,
-    "lineHeight",
-    "mobile"
-  );
-  const letterSpacing = await getVariableBreakpointValue(
-    style,
-    "letterSpacing",
-    "mobile"
-  );
-  const desktopFontSize = await getVariableBreakpointValue(
-    style,
-    "fontSize",
-    "desktop"
-  );
-  const desktopLineHeight = await getVariableBreakpointValue(
-    style,
-    "lineHeight",
-    "desktop"
-  );
-  const desktopLetterSpacing = await getVariableBreakpointValue(
-    style,
-    "letterSpacing",
-    "desktop"
-  );
-
-  return {
-    fontName: style.name.replace(/[/\s]/g, ""),
-    fontSize: `rem(${fontSize}px)`,
-    letterSpacing: formatField(letterSpacing, "letterSpacing", style),
-    lineHeight: formatField(lineHeight, "lineHeight", style),
-    desktopFontSize: desktopFontSize ? `rem(${desktopFontSize}px)` : undefined,
-    desktopLineHeight: desktopLineHeight
-      ? formatField(lineHeight, "lineHeight", style)
-      : undefined,
-    desktopLetterSpacing: desktopLetterSpacing
-      ? formatField(letterSpacing, "letterSpacing", style)
-      : undefined,
-  };
-}
-
-function formatField(
-  value: FigmaVariableValue,
-  field: "lineHeight" | "letterSpacing",
-  style: TextStyle
-) {
-  const unit = style[field].unit;
-
-  if (unit === "PERCENT") return `${value}%`;
-  else if (unit === "PIXELS") return `rem(${value}px)`;
-  else return value?.toString() || "";
-}
-
-async function getVariableBreakpointValue(
-  style: TextStyle,
-  field: TextStyleField,
-  breakpoint: "mobile" | "desktop"
-) {
-  const isMobile = breakpoint === "mobile";
-  const variableId = style.boundVariables?.[field]?.id;
-  const variableObj = await figma.variables.getVariableByIdAsync(
-    variableId || ""
-  );
-
-  if (!variableObj) {
-    const mobileVal = (style[field] as FieldWithValue)?.value ?? style[field];
-    return isMobile ? mobileVal : undefined;
-  }
-
-  const variableValuesByMode = variableObj.valuesByMode || {};
-  const allModeKeys = Object.keys(variableValuesByMode);
-
-  if (allModeKeys.length > 1) {
-    const firstKey = allModeKeys[0];
-    const secondKey = allModeKeys[1];
-    const firstValue = variableValuesByMode[firstKey];
-    const secondValue = variableValuesByMode[secondKey];
-
-    if (!firstValue || !secondValue) return "";
-
-    const firstValLarger = firstValue > secondValue;
-
-    if (firstValue === secondValue && breakpoint === "desktop")
-      return undefined;
-
-    const mobile = firstValLarger ? secondValue : firstValue;
-    const desktop = firstValLarger ? firstValue : secondValue;
-
-    return breakpoint === "mobile" ? mobile : desktop;
-  }
-}
-
-function convertMixinsToSassFormat(fontMixins: TextStyleData[]): string {
-  const sassMixins = fontMixins.map((mixin) => {
-    let mixinString = `<div class="font-styles">@mixin text${mixin.fontName} {</div> <div class="mobile-style">font-size: ${mixin.fontSize};</div> <div class="mobile-style">line-height: ${mixin.lineHeight};</div> <div class="mobile-style">letter-spacing: ${mixin.letterSpacing};</div>`;
-    if (
-      mixin.desktopFontSize ||
-      mixin.desktopLineHeight ||
-      mixin.desktopLetterSpacing
-    ) {
-      mixinString += `<div class="desktop-font-styles">@include desktopAndUp {</div>`;
-      if (mixin.desktopFontSize)
-        mixinString += `<div class="desktop-style">font-size: ${mixin.desktopFontSize};</div>`;
-      if (mixin.desktopLineHeight)
-        mixinString += `<div class="desktop-style">line-height: ${mixin.desktopLineHeight};</div>`;
-      if (mixin.desktopLetterSpacing)
-        mixinString += `<div class="desktop-style">letter-spacing: ${mixin.desktopLetterSpacing};</div>`;
-      mixinString += `<div class="desktop-font-styles">}</div>`;
-    }
-    mixinString += `<div class="font-styles-end">}</div>`;
-
-    return mixinString;
-  });
-
-  let allMixins = "";
-  sassMixins.forEach((sassMixin) => {
-    allMixins += `\n\n ${sassMixin}`;
-  });
-
-  return allMixins;
-}
+//   if (unit === "PERCENT") return `${value}%`;
+//   else if (unit === "PIXELS") return `rem(${value}px)`;
+//   else return value?.toString() || "";
+// }

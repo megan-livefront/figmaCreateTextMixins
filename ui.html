@@ -1,9 +1,12 @@
 <div class="wrapper">
-  <button id="create-color-vars">Generate Sass Color Variables</button>
-  <button id="create-text-mixins">Generate Sass Text Style Mixins</button>
-  <button id="create-spacing-mixins">Generate Sass Spacing Mixins</button>
+  <button id="load-collections">load collections</button>
+  <select id="collections-select"></select>
+
+  <div id="formatting-instructions"></div>
   <textarea id="formatter"></textarea>
   <button id="formatter-submit">Generate</button>
+
+  <div id="current-collection-id"></div>
   <div class="util-buttons-wrapper" id="util-buttons-wrapper">
     <button class="back" id="back">Back</button>
     <button class="copy-all" id="copy-all">Copy to clipboard</button>
@@ -12,27 +15,23 @@
 </div>
 
 <script>
-  document.getElementById('create-text-mixins').onclick = () => {
-    parent.postMessage({ pluginMessage: { type: 'create-text-mixins' } }, '*')
+  document.getElementById('load-collections').onclick = () => {
+    parent.postMessage({ pluginMessage: { type: 'load-collections' } }, '*')
   }
 
-  document.getElementById('create-color-vars').onclick = () => {
-    parent.postMessage({ pluginMessage: { type: 'create-color-vars' } }, '*')
-  }
-
-  document.getElementById('create-spacing-mixins').onclick = () => {
-    document.getElementById('create-text-mixins').style.display = 'none'
-    document.getElementById('create-color-vars').style.display = 'none'
-    document.getElementById('create-spacing-mixins').style.display = 'none'
-    document.getElementById('formatter').style.display = 'block'
-    document.getElementById('formatter-submit').style.display = 'block'
+  document.getElementById('collections-select').onchange = (event) => {
+    console.log('EVENT', event.target.value)
+    document.getElementById('current-collection-id').innerText = event.target.value
+    parent.postMessage({ pluginMessage: { type: 'collection-selected', collectionId: event.target.value } }, '*')
   }
 
   document.getElementById('formatter-submit').onclick = (event) => {
     const formatterText = document.getElementById('formatter').value
+    const collectionId = document.getElementById('current-collection-id').innerText
+    document.getElementById('formatting-instructions').style.display = 'none'
     document.getElementById('formatter').style.display = 'none'
     document.getElementById('formatter-submit').style.display = 'none'
-    parent.postMessage({ pluginMessage: { type: 'create-spacing-mixins', format: formatterText } }, '*')
+    parent.postMessage({ pluginMessage: { type: 'create-mixins', format: formatterText, collectionId } }, '*')
   }
 
   document.getElementById('copy-all').onclick = () => {
@@ -58,20 +57,62 @@
 
   document.getElementById('back').onclick = () => {
     document.getElementById('util-buttons-wrapper').style.display = 'none'
-    document.getElementById('create-text-mixins').style.display = 'block'
-    document.getElementById('create-color-vars').style.display = 'block'
-    document.getElementById('create-spacing-mixins').style.display = 'block'
+    document.getElementById('formatting-instructions').style.display = 'none'
+    document.getElementById('formatter').style.display = 'none'
+    document.getElementById('formatter-submit').style.display = 'none'
+    document.getElementById('load-collections').style.display = 'block'
+    document.getElementById('collections-select').style.display = 'block'
     document.getElementById('content-wrapper').innerHTML = ''
   }
 
   window.onmessage = (event) => {
-    const { type, mixins } = event.data.pluginMessage
+    const messageData = event.data.pluginMessage
+    const { type } = messageData
     if (type === 'mixins-created') {
+      const { mixins } = messageData
+
       document.getElementById('util-buttons-wrapper').style.display = 'flex'
-      document.getElementById('create-text-mixins').style.display = 'none'
-      document.getElementById('create-color-vars').style.display = 'none'
-      document.getElementById('create-spacing-mixins').style.display = 'none'
+      document.getElementById('formatting-instructions').style.display = 'none'
+      document.getElementById('formatter').style.display = 'none'
+      document.getElementById('formatter-submit').style.display = 'none'
       document.getElementById('content-wrapper').innerHTML = mixins
+    }
+    else if (type === 'collections-loaded') {
+      const { collections } = messageData
+      const select = document.getElementById('collections-select')
+
+      collections.forEach(collection => {
+        const option = document.createElement('option');
+        option.value = collection.id
+        option.innerText = collection.name
+
+        select.appendChild(option)
+      })
+
+      console.log('COLLECTIONS', collections)
+    }
+    else if (type === 'collection-vars-loaded') {
+      const { formattingVars } = messageData
+      const formattingInstructions = document.getElementById('formatting-instructions')
+
+      const varNamesString = formattingVars
+        .map((varName, index) => {
+          // Format each item as ${varName}, but leave the last one special with "and"
+          return index === formattingVars.length - 1
+            ? `and \${${varName}}` // Add "and" before the last item
+            : `\${${varName}}`;
+        })
+        .join(', ')
+
+      formattingInstructions.innerText = `Use ${varNamesString} inside of your format to replace with variable values`
+
+      document.getElementById('formatting-instructions').style.display = 'block'
+      document.getElementById('formatter').style.display = 'block'
+      document.getElementById('formatter-submit').style.display = 'block'
+      document.getElementById('collections-select').style.display = 'none'
+      document.getElementById('load-collections').style.display = 'none'
+
+      console.log('FORMATTING VARS', varNamesString)
     }
   }
 </script>
@@ -95,6 +136,10 @@
     cursor: pointer;
   }
 
+  #current-collection-id {
+    display: none;
+  }
+
   .first-line {
     margin-top: 10px;
   }
@@ -105,6 +150,10 @@
 
   .tab-2 {
     padding-left: 32px;
+  }
+
+  #formatting-instructions {
+    display: none;
   }
 
   #formatter {
