@@ -95,15 +95,15 @@ function toCamelCase(str: string) {
 async function getCollectionVariables(collection: VariableCollection) {
   const collectionVars: Variable[] = [];
 
-  await Promise.all(
-    collection.variableIds.map(async (variableId) => {
-      const collectionVar = await figma.variables.getVariableByIdAsync(
-        variableId
-      );
+  for (const variableId of collection.variableIds) {
+    const collectionVar = await figma.variables.getVariableByIdAsync(
+      variableId
+    );
 
-      if (collectionVar) collectionVars.push(collectionVar);
-    })
-  );
+    if (collectionVar) {
+      collectionVars.push(collectionVar);
+    }
+  }
 
   return collectionVars;
 }
@@ -125,36 +125,34 @@ async function printFormattedVariables(format: string, collectionId: string) {
   // Convert the input format string to an html string
   const formatHtmlString = transformString(format);
 
-  await Promise.all(
-    collectionVars.map(async (collectionVar) => {
-      // get the variable's values for each mode in the collection in the format [{ [mode1Name]: 20 }, { [mode2Name]: 40 }]
-      const modeValuesForVariable: ModeMap[] = await getModeValuesForVariable(
-        collectionVar,
-        collection.modes
-      );
+  for (const collectionVar of collectionVars) {
+    const modeValuesForVariable: ModeMap[] = await getModeValuesForVariable(
+      collectionVar,
+      collection.modes
+    );
+    console.log("MODE MAPS", collectionVar, modeValuesForVariable);
 
-      // put all mode value objects from the `modeValuesForVariable` array into one object
-      const allModeValuesObject = Object.assign({}, ...modeValuesForVariable);
+    // put all mode value objects from the `modeValuesForVariable` array into one object
+    const allModeValuesObject = Object.assign({}, ...modeValuesForVariable);
 
-      // create the object that tells `insertVariables` what values to replace and with what value
-      const varNameKey = `${toCamelCase(collection.name)}VarName`;
-      const variablesToReplaceWithValues = {
-        [varNameKey]: toCamelCase(collectionVar.name),
-        ...allModeValuesObject,
-      };
+    // create the object that tells `insertVariables` what values to replace and with what value
+    const varNameKey = `${toCamelCase(collection.name)}VarName`;
+    const variablesToReplaceWithValues = {
+      [varNameKey]: toCamelCase(collectionVar.name),
+      ...allModeValuesObject,
+    };
 
-      console.log("VARIABLES OBJECT", variablesToReplaceWithValues);
+    console.log("VARIABLES OBJECT", variablesToReplaceWithValues);
 
-      // create the html string that has the values from the variable in it
-      const htmlStringWithRealValues = insertVariables(
-        formatHtmlString,
-        variablesToReplaceWithValues
-      );
+    // create the html string that has the values from the variable in it
+    const htmlStringWithRealValues = insertVariables(
+      formatHtmlString,
+      variablesToReplaceWithValues
+    );
 
-      // add the created html string to the main html string that will be presented to the user
-      collectionVarsHtml += htmlStringWithRealValues;
-    })
-  );
+    // add the created html string to the main html string that will be presented to the user
+    collectionVarsHtml += htmlStringWithRealValues;
+  }
 
   figma.ui.postMessage({ type: "mixins-created", mixins: collectionVarsHtml });
 }
@@ -162,28 +160,38 @@ async function printFormattedVariables(format: string, collectionId: string) {
 /** Returns the variables values for each of the given modes. */
 async function getModeValuesForVariable(
   variable: Variable,
-  modes: Mode[]
+  modes: Mode[],
+  aliasOriginalModes?: Mode[]
 ): Promise<ModeMap[]> {
   const modeMaps: ModeMap[] = [];
+  console.log("CALLED");
 
-  await Promise.all(
-    modes.map(async (mode) => {
-      const modeValue = variable.valuesByMode[mode.modeId];
-      // Figure out what to do for colors and variable aliases
-      if (modeValIsVariableAlias(modeValue)) {
-        return await getAliasVariableModeValues(modeValue);
-      }
+  for (const [index, mode] of modes.entries()) {
+    const modeValue = variable.valuesByMode[mode.modeId];
 
-      const modeMap = { [mode.name]: modeValue };
-      console.log("GETTING HERE", modeMap);
+    // Figure out what to do for colors and variable aliases
+    if (modeValIsVariableAlias(modeValue)) {
+      console.log("MAPPING ALIAS", variable.name, mode.name);
+      // Await the alias values to ensure that recursion completes before continuing
+      return (await getAliasVariableModeValues(modeValue, modes)) || [];
+    } else {
+      const modeKey = aliasOriginalModes
+        ? aliasOriginalModes[index].name
+        : mode.name;
+      const modeMap = { [modeKey]: modeValue };
       modeMaps.push(modeMap);
-    })
-  );
+      console.log("MAPPING NORMAL", variable.name, modeMaps);
+    }
+  }
 
+  console.log("MODE MAPS DOWN HERE", variable.name, modeMaps);
   return modeMaps;
 }
 
-async function getAliasVariableModeValues(modeValue: VariableValue) {
+async function getAliasVariableModeValues(
+  modeValue: VariableValue,
+  aliasOriginalModes?: Mode[]
+): Promise<ModeMap[] | undefined> {
   const aliasId = getAliasModeValueId(modeValue);
   const aliasedVariable = await figma.variables.getVariableByIdAsync(aliasId);
 
@@ -198,7 +206,8 @@ async function getAliasVariableModeValues(modeValue: VariableValue) {
 
   return await getModeValuesForVariable(
     aliasedVariable,
-    aliasedVariableCollection.modes
+    aliasedVariableCollection.modes,
+    aliasOriginalModes
   );
 }
 
