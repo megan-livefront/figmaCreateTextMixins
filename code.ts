@@ -130,7 +130,6 @@ async function printFormattedVariables(format: string, collectionId: string) {
       collectionVar,
       collection.modes
     );
-    console.log("MODE MAPS", collectionVar, modeValuesForVariable);
 
     // put all mode value objects from the `modeValuesForVariable` array into one object
     const allModeValuesObject = Object.assign({}, ...modeValuesForVariable);
@@ -141,8 +140,6 @@ async function printFormattedVariables(format: string, collectionId: string) {
       [varNameKey]: toCamelCase(collectionVar.name),
       ...allModeValuesObject,
     };
-
-    console.log("VARIABLES OBJECT", variablesToReplaceWithValues);
 
     // create the html string that has the values from the variable in it
     const htmlStringWithRealValues = insertVariables(
@@ -164,14 +161,12 @@ async function getModeValuesForVariable(
   aliasOriginalModes?: Mode[]
 ): Promise<ModeMap[]> {
   const modeMaps: ModeMap[] = [];
-  console.log("CALLED");
 
   for (const [index, mode] of modes.entries()) {
     const modeValue = variable.valuesByMode[mode.modeId];
 
     // Figure out what to do for colors and variable aliases
     if (modeValIsVariableAlias(modeValue)) {
-      console.log("MAPPING ALIAS", variable.name, mode.name);
       // Await the alias values to ensure that recursion completes before continuing
       return (await getAliasVariableModeValues(modeValue, modes)) || [];
     } else {
@@ -180,11 +175,9 @@ async function getModeValuesForVariable(
         : mode.name;
       const modeMap = { [modeKey]: modeValue };
       modeMaps.push(modeMap);
-      console.log("MAPPING NORMAL", variable.name, modeMaps);
     }
   }
 
-  console.log("MODE MAPS DOWN HERE", variable.name, modeMaps);
   return modeMaps;
 }
 
@@ -270,8 +263,6 @@ function insertVariables(
 ) {
   // Use a regular expression to replace the placeholders in the input string
   return inputString.replace(/\$\{([^}]+)\}/g, (match, variableName) => {
-    // Need to make sure we are mapping the aliased variables mode name to the original one we asked the user to use
-    console.log("VARIABLE INFO", variables, variableName);
     // Check if the variable exists in the provided variables object
     if (Object.prototype.hasOwnProperty.call(variables, variableName)) {
       return variables[variableName];
