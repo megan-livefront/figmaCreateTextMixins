@@ -1,7 +1,11 @@
 <div class="wrapper">
-  <button id="load-collections">load collections</button>
-  <div class="select-wrapper">
-    <select id="collections-select"></select>
+  <button id="load-collections">Load collections</button>
+
+  <div id="select-section">
+    <h1 class="select-header">Select a collection</h1>
+    <div id="select-wrapper">
+      <select id="collections-select"></select>
+    </div>
   </div>
 
   <div id="formatting-instructions"></div>
@@ -9,11 +13,11 @@
   <button id="formatter-submit">Generate</button>
 
   <div id="current-collection-id"></div>
-  <div class="util-buttons-wrapper" id="util-buttons-wrapper">
+  <div id="util-buttons-wrapper">
     <button class="back" id="back">Back</button>
     <button class="copy-all" id="copy-all">Copy to clipboard</button>
   </div>
-  <div class="content-wrapper" id="content-wrapper"></div>
+  <div id="content-wrapper"></div>
 </div>
 
 <script>
@@ -69,16 +73,7 @@
   window.onmessage = (event) => {
     const messageData = event.data.pluginMessage
     const { type } = messageData
-    if (type === 'variables-formatted') {
-      const { mixins } = messageData
-
-      document.getElementById('util-buttons-wrapper').style.display = 'flex'
-      document.getElementById('formatting-instructions').style.display = 'none'
-      document.getElementById('formatter').style.display = 'none'
-      document.getElementById('formatter-submit').style.display = 'none'
-      document.getElementById('content-wrapper').innerHTML = mixins
-    }
-    else if (type === 'collections-loaded') {
+    if (type === 'collections-loaded') {
       const { collections } = messageData
       const select = document.getElementById('collections-select')
 
@@ -89,6 +84,10 @@
 
         select.appendChild(option)
       })
+
+      document.getElementById('select-section').style.display = 'block'
+
+      document.getElementById('load-collections').style.display = 'none'
     }
     else if (type === 'collection-vars-loaded') {
       const { formattingVars } = messageData
@@ -108,8 +107,18 @@
       document.getElementById('formatting-instructions').style.display = 'block'
       document.getElementById('formatter').style.display = 'block'
       document.getElementById('formatter-submit').style.display = 'block'
-      document.getElementById('collections-select').style.display = 'none'
-      document.getElementById('load-collections').style.display = 'none'
+
+      document.getElementById('select-section').style.display = 'none'
+    }
+    else if (type === 'variables-formatted') {
+      const { collectionVarsHtml } = messageData
+
+      document.getElementById('util-buttons-wrapper').style.display = 'flex'
+      document.getElementById('content-wrapper').innerHTML = collectionVarsHtml
+
+      document.getElementById('formatting-instructions').style.display = 'none'
+      document.getElementById('formatter').style.display = 'none'
+      document.getElementById('formatter-submit').style.display = 'none'
     }
   }
 </script>
@@ -131,13 +140,28 @@
     border: none;
     padding: 12px;
     cursor: pointer;
+    width: 180px;
+    align-self: center;
   }
 
-  .select-wrapper {
+  #select-section {
+    display: none;
+    align-self: center;
+  }
+
+  .select-header {
+    margin-bottom: 16px;
+    font-size: 25px;
+    font-family: sans-serif;
+    text-align: center;
+  }
+
+  #select-wrapper {
     position: relative;
+    width: 300px;
   }
 
-  .select-wrapper::after {
+  #select-wrapper::after {
     content: '^';
     position: absolute;
     right: 12px;
@@ -183,14 +207,14 @@
     display: none;
   }
 
-  .util-buttons-wrapper {
+  #util-buttons-wrapper {
     display: none;
     justify-content: center;
     gap: 12px;
     margin-top: 16px;
   }
 
-  .content-wrapper {
+  #content-wrapper {
     display: flex;
     flex-direction: column;
   }

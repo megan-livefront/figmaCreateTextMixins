@@ -1,4 +1,5 @@
 figma.showUI(__html__);
+figma.ui.resize(400, 300);
 
 type Mode = {
   modeId: string;
@@ -54,7 +55,7 @@ async function postFormattedVariables(format: string, collectionId: string) {
 
   figma.ui.postMessage({
     type: "variables-formatted",
-    mixins: collectionVarsHtml,
+    collectionVarsHtml,
   });
 }
 
