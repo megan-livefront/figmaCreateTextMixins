@@ -6,6 +6,7 @@
     <div id="select-wrapper">
       <select id="collections-select"></select>
     </div>
+    <button id="collection-submit">Submit</button>
   </div>
 
   <div id="formatting-instructions"></div>
@@ -25,9 +26,10 @@
     parent.postMessage({ pluginMessage: { type: 'load-collections' } }, '*')
   }
 
-  document.getElementById('collections-select').onchange = (event) => {
-    document.getElementById('current-collection-id').innerText = event.target.value
-    parent.postMessage({ pluginMessage: { type: 'collection-selected', collectionId: event.target.value } }, '*')
+  document.getElementById('collection-submit').onclick = (event) => {
+    const collectionId = document.getElementById('collections-select').value
+    document.getElementById('current-collection-id').innerText = collectionId
+    parent.postMessage({ pluginMessage: { type: 'collection-selected', collectionId } }, '*')
   }
 
   document.getElementById('formatter-submit').onclick = (event) => {
@@ -77,15 +79,17 @@
       const { collections } = messageData
       const select = document.getElementById('collections-select')
 
-      collections.forEach(collection => {
-        const option = document.createElement('option');
-        option.value = collection.id
-        option.innerText = collection.name
+      if (select.children.length === 0) {
+        collections.forEach(collection => {
+          const option = document.createElement('option');
+          option.value = collection.id
+          option.innerText = collection.name
 
-        select.appendChild(option)
-      })
+          select.appendChild(option)
+        })
+      }
 
-      document.getElementById('select-section').style.display = 'block'
+      document.getElementById('select-section').style.display = 'flex'
 
       document.getElementById('load-collections').style.display = 'none'
     }
@@ -148,6 +152,8 @@
   #select-section {
     display: none;
     align-self: center;
+    flex-direction: column;
+    align-items: center;
   }
 
   .select-header {
@@ -177,6 +183,10 @@
     position: relative;
     border-radius: 6px;
     width: 100%;
+  }
+
+  #collection-submit {
+    margin-top: 10px;
   }
 
   #current-collection-id {
