@@ -93,16 +93,17 @@
       const { formattingVars } = messageData
       const formattingInstructions = document.getElementById('formatting-instructions')
 
-      const varNamesString = formattingVars
-        .map((varName, index) => {
-          // Format each item as ${varName}, but leave the last one special with "and"
-          return index === formattingVars.length - 1
-            ? `and \${${varName}}` // Add "and" before the last item
-            : `\${${varName}}`;
-        })
-        .join(', ')
+      let varNamesString = ''
+      formattingVars.forEach((varName) => {
+        varNamesString += `<div>\${${varName}}</div>`
+      })
 
-      formattingInstructions.innerText = `Use ${varNamesString} inside of your format to replace with variable values`
+      formattingInstructions.innerHTML = `
+            <div class="intro-summary">Write the format you want each variable's data to show up in. Wherever the following
+              variables show up in the format (include the dollar sign and brackets) will be replaced with dynamic data for  
+              each variable. Include a newline character (\\n) for new lines and tab characters (\\t) to add tabs to a line.</div>
+            <div class="intro-variables">${varNamesString}</div>
+            `
 
       document.getElementById('formatting-instructions').style.display = 'block'
       document.getElementById('formatter').style.display = 'block'
@@ -196,6 +197,16 @@
 
   #formatting-instructions {
     display: none;
+    font-family: sans-serif;
+  }
+
+  .intro-summary {
+    margin-bottom: 10px;
+  }
+
+  .intro-variables {
+    font-weight: bold;
+    font-size: 14px;
   }
 
   #formatter {
