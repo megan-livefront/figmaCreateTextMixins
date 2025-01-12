@@ -1,5 +1,5 @@
 figma.showUI(__html__);
-figma.ui.resize(400, 300);
+figma.ui.resize(400, 400);
 
 type Mode = {
   modeId: string;
